@@ -1,0 +1,72 @@
+---
+import AdminLayout from '../../components/admin/AdminLayout.astro';
+---
+
+<AdminLayout title="Data" current="data">
+  <h1 class="text-3xl font-bold">Customer data</h1>
+  <p class="mt-1 max-w-2xl text-cocoa-soft">
+    Customer names, phone numbers, and addresses are private. When the fundraiser is over, export a
+    final copy if you need one, then delete all order data.
+  </p>
+
+  <section class="card mt-6 p-5 sm:p-6" aria-labelledby="export-title">
+    <h2 id="export-title" class="text-xl font-semibold">
+      1. Export orders
+    </h2>
+    <p class="mt-1 text-cocoa-soft">
+      Downloads every order as a spreadsheet-friendly CSV. Store it somewhere private and delete it
+      when you no longer need it.
+    </p>
+    <button type="button" id="export-csv" class="btn-secondary mt-4">
+      Download CSV
+    </button>
+  </section>
+
+  <section class="card mt-6 border-berry/30 p-5 sm:p-6" aria-labelledby="purge-title">
+    <h2 id="purge-title" class="text-xl font-semibold">
+      2. Delete all customer and order data
+    </h2>
+    <p class="mt-1 text-cocoa-soft">
+      Permanently deletes every order, including names, phone numbers, and addresses. Inventory
+      counts are kept. This cannot be undone.
+    </p>
+    <form id="purge-form" class="mt-4 grid max-w-md gap-3">
+      <label for="purge-confirm" class="field-label">
+        Type <strong>DELETE ALL ORDERS</strong> to confirm
+      </label>
+      <input id="purge-confirm" class="field-input" autocomplete="off" required />
+      <button
+        type="submit"
+        id="purge-submit"
+        class="btn bg-cocoa-ink text-white hover:bg-berry-dark"
+      >
+        Delete everything
+      </button>
+    </form>
+  </section>
+</AdminLayout>
+
+<script>
+  import { byId } from '../../lib/client/dom';
+  import { adminDownload, adminPost } from '../../scripts/admin/session';
+  import { toast, withButton } from '../../scripts/admin/ui';
+
+  const exportButton = byId<HTMLButtonElement>('export-csv');
+  exportButton.addEventListener('click', () =>
+    withButton(exportButton, () => adminDownload('/api/admin/orders.csv')),
+  );
+
+  const form = byId<HTMLFormElement>('purge-form');
+  const confirmInput = byId<HTMLInputElement>('purge-confirm');
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void withButton(byId<HTMLButtonElement>('purge-submit'), async () => {
+      if (!confirm('Permanently delete all orders and customer details?')) return;
+      const result = await adminPost<{ deletedOrders: number }>('/api/admin/data/purge', {
+        confirm: confirmInput.value.trim(),
+      });
+      form.reset();
+      toast(`Deleted ${result.deletedOrders} orders.`);
+    });
+  });
+</script>

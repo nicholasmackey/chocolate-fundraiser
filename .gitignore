@@ -2,6 +2,7 @@
 dist/
 # generated types
 .astro/
+worker-configuration.d.ts
 
 # dependencies
 node_modules/
@@ -12,13 +13,23 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-
-# environment variables
+# secrets and environment variables
 .env
-.env.production
+.env.*
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# local Cloudflare / D1 state
+.wrangler/
+
+# data exports (customer data must not be committed)
+exports/
+*.csv
 
 # macOS-specific files
 .DS_Store
 
 # jetbrains setting folder
 .idea/
+!.env.example

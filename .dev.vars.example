@@ -1,0 +1,14 @@
+# Local secrets for the API Worker (`pnpm api:dev`). Copy to .dev.vars. Never commit .dev.vars.
+
+# Generate with: pnpm hash-password
+ADMIN_PASSWORD_HASH="pbkdf2_sha256$100000$REPLACE_WITH_SALT$REPLACE_WITH_HASH"
+
+# Generate with: openssl rand -base64 48
+SESSION_SECRET="REPLACE_WITH_A_LONG_RANDOM_STRING"
+
+# Cloudflare's documented Turnstile test secret (always passes).
+# Production uses `wrangler secret put TURNSTILE_SECRET_KEY`.
+TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
+
+# The local Astro dev server.
+ALLOWED_ORIGINS="http://localhost:4321"

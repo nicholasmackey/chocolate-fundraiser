@@ -1,0 +1,153 @@
+---
+import { FIELD_LIMITS, US_STATES } from '../../shared/validation';
+---
+
+<form id="checkout-form" class="card mt-4 scroll-mt-4 p-5 sm:p-6" novalidate hidden>
+  <h2 class="text-2xl font-semibold">Delivery details</h2>
+  <p class="mt-1 text-sm text-cocoa-soft">
+    No account needed. We only use this to deliver your chocolate.
+  </p>
+
+  <div class="mt-5 grid gap-4">
+    <div>
+      <label for="customerName" class="field-label">
+        Full name
+      </label>
+      <input
+        id="customerName"
+        name="customerName"
+        class="field-input"
+        autocomplete="name"
+        required
+        minlength="2"
+        maxlength={FIELD_LIMITS.customerName}
+        aria-describedby="customerName-error"
+      />
+      <p id="customerName-error" class="field-error" hidden></p>
+    </div>
+
+    <div>
+      <label for="phone" class="field-label">
+        Phone number
+      </label>
+      <input
+        id="phone"
+        name="phone"
+        type="tel"
+        class="field-input"
+        autocomplete="tel-national"
+        inputmode="tel"
+        required
+        maxlength={FIELD_LIMITS.phone}
+        placeholder="(555) 555-0123"
+        aria-describedby="phone-error"
+      />
+      <p id="phone-error" class="field-error" hidden></p>
+    </div>
+
+    <div>
+      <label for="street" class="field-label">
+        Street address
+      </label>
+      <input
+        id="street"
+        name="street"
+        class="field-input"
+        autocomplete="street-address"
+        required
+        maxlength={FIELD_LIMITS.street}
+        aria-describedby="street-error"
+      />
+      <p id="street-error" class="field-error" hidden></p>
+    </div>
+
+    <div class="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3">
+      <div>
+        <label for="city" class="field-label">
+          City
+        </label>
+        <input
+          id="city"
+          name="city"
+          class="field-input"
+          autocomplete="address-level2"
+          required
+          maxlength={FIELD_LIMITS.city}
+          aria-describedby="city-error"
+        />
+        <p id="city-error" class="field-error" hidden></p>
+      </div>
+      <div>
+        <label for="state" class="field-label">
+          State
+        </label>
+        <select
+          id="state"
+          name="state"
+          class="field-input px-3"
+          autocomplete="address-level1"
+          required
+          aria-describedby="state-error"
+        >
+          <option value=""></option>
+          {US_STATES.map((state) => (
+            <option value={state}>{state}</option>
+          ))}
+        </select>
+        <p id="state-error" class="field-error" hidden></p>
+      </div>
+    </div>
+
+    <div class="max-w-40">
+      <label for="zip" class="field-label">
+        ZIP code
+      </label>
+      <input
+        id="zip"
+        name="zip"
+        class="field-input"
+        autocomplete="postal-code"
+        inputmode="numeric"
+        required
+        maxlength={FIELD_LIMITS.zip}
+        pattern="\d{5}(-\d{4})?"
+        aria-describedby="zip-error"
+      />
+      <p id="zip-error" class="field-error" hidden></p>
+    </div>
+
+    <div>
+      <label for="deliveryInstructions" class="field-label">
+        Delivery instructions <span class="font-normal text-cocoa-soft">(optional)</span>
+      </label>
+      <textarea
+        id="deliveryInstructions"
+        name="deliveryInstructions"
+        rows="3"
+        class="field-input"
+        maxlength={FIELD_LIMITS.deliveryInstructions}
+        placeholder="Gate code, best time to drop off, etc."
+        aria-describedby="deliveryInstructions-error"
+      ></textarea>
+      <p id="deliveryInstructions-error" class="field-error" hidden></p>
+    </div>
+  </div>
+
+  <p class="mt-5 rounded-2xl bg-honey-soft/70 p-4 text-sm text-cocoa">
+    <strong>No payment now.</strong> After you submit, our family will contact you to coordinate
+    payment and delivery.
+  </p>
+
+  <div id="turnstile" class="mt-5 min-h-[65px]"></div>
+
+  <p
+    id="checkout-error"
+    class="mt-4 rounded-2xl bg-berry/10 p-4 text-sm font-semibold text-berry-dark"
+    role="alert"
+    hidden
+  ></p>
+
+  <button type="submit" id="checkout-submit" class="btn-primary mt-5 w-full min-h-14 text-lg">
+    Place order
+  </button>
+</form>

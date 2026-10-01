@@ -1,17 +1,248 @@
 ---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import BrandMark from '../components/BrandMark.astro';
+import CheckoutForm from '../components/CheckoutForm.astro';
+import barsPhoto from '../assets/photos/chocolate-bars.jpg';
+import { BOX_PRICE_CENTS, BOX_SIZE, BAR_PRICE_CENTS, formatCents } from '../../shared/pricing';
 
+const FLAVOR_NAMES = ['Milk Chocolate', 'Caramel', 'Crisp', 'Wafer', 'Almond', 'Pretzel'];
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<BaseLayout title="Chocolate Fundraiser · Help Support Our School!">
+  <header class="px-4 pt-6 sm:pt-10">
+    <div class="mx-auto flex max-w-6xl justify-center">
+      <BrandMark class="w-60 sm:w-80" />
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-4 pb-32 lg:pb-16">
+    <section
+      class="grid items-center gap-8 pt-8 pb-10 sm:pt-12 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:pb-14 lg:gap-14"
+      aria-labelledby="page-title"
+    >
+      <div class="text-center md:text-left">
+        <p
+          class="font-display text-6xl leading-none font-bold tracking-tight text-honey uppercase sm:text-7xl lg:text-8xl"
+          aria-hidden="true"
+        >
+          Fundraiser
+        </p>
+        <h1 id="page-title" class="mt-3 text-4xl leading-[1.05] font-bold text-balance sm:text-5xl">
+          Help Support Our School!
+        </h1>
+        <p class="mt-3 text-lg font-semibold text-cocoa">
+          {FLAVOR_NAMES.map((name) => name.toLowerCase()).join(' • ')}
+        </p>
+        <p class="mx-auto mt-4 max-w-xl text-lg text-pretty text-cocoa-soft md:mx-0">
+          Every bar you buy helps fund classroom supplies, field trips, and special projects. Pick
+          your favorite flavors below, and our family will deliver them to your door.
+        </p>
+        <div class="mt-6 flex flex-wrap items-end justify-center gap-x-8 gap-y-4 md:justify-start">
+          <p class="font-display leading-none font-bold text-berry">
+            <span class="text-7xl sm:text-8xl">
+              {formatCents(BAR_PRICE_CENTS).replace('.00', '')}
+            </span>
+            <span class="block text-3xl uppercase sm:text-4xl">each</span>
+          </p>
+          <p class="pb-1 font-display leading-none font-bold text-cocoa">
+            <span class="text-5xl sm:text-6xl">
+              {formatCents(BOX_PRICE_CENTS).replace('.00', '')}
+            </span>
+            <span class="block text-2xl uppercase">per box</span>
+            <span class="block font-sans text-base font-semibold text-cocoa-soft uppercase">
+              ({BOX_SIZE} count)
+            </span>
+          </p>
+        </div>
+      </div>
+      <img
+        src={barsPhoto.src}
+        width={barsPhoto.width}
+        height={barsPhoto.height}
+        alt="Two hands holding six World’s Finest Chocolate bars: Milk Chocolate, Almond, Pretzel, Caramel, Crisp, and Wafer."
+        class="mx-auto h-auto w-56 rounded-[2rem] border border-cocoa/10 shadow-[0_1px_0_rgb(103_61_57/0.06)] sm:w-64 md:w-full"
+        fetchpriority="high"
+      />
+    </section>
+
+    <div
+      id="store-loading"
+      class="grid gap-4 sm:grid-cols-2"
+      aria-busy="true"
+      aria-label="Loading flavors"
+    >
+      {Array.from({ length: 6 }, () => (
+        <div class="card h-52 animate-pulse bg-white/60" />
+      ))}
+    </div>
+
+    <div id="store-error" class="card mx-auto max-w-lg p-8 text-center" role="alert" hidden>
+      <h2 class="text-2xl font-semibold">We couldn’t load the shop</h2>
+      <p class="mt-2 text-cocoa-soft">Please check your connection and try again.</p>
+      <button type="button" id="store-retry" class="btn-primary mt-5">
+        Try again
+      </button>
+    </div>
+
+    <div
+      id="store-notice"
+      class="card mx-auto mb-8 max-w-2xl border-honey/50 bg-honey-soft/60 p-6 text-center"
+      role="status"
+      hidden
+    >
+      <h2 id="store-notice-title" class="text-2xl font-semibold"></h2>
+      <p id="store-notice-body" class="mt-1 text-cocoa-soft"></p>
+    </div>
+
+    <div id="store" class="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_24rem]" hidden>
+      <section aria-labelledby="flavors-title">
+        <h2 id="flavors-title" class="mb-4 text-2xl font-semibold sm:text-3xl">
+          Choose your flavors
+        </h2>
+        <ul id="product-list" class="grid gap-4 sm:grid-cols-2"></ul>
+      </section>
+
+      <aside id="checkout" class="lg:sticky lg:top-6" aria-labelledby="summary-title">
+        <div class="card p-5 sm:p-6">
+          <h2 id="summary-title" class="text-2xl font-semibold">
+            Your order
+          </h2>
+          <p id="summary-empty" class="mt-3 text-cocoa-soft">
+            Add a few bars to get started.
+          </p>
+          <ul id="summary-lines" class="mt-3 divide-y divide-cocoa/10" aria-live="polite"></ul>
+          <div
+            id="summary-totals"
+            class="mt-3 border-t-2 border-dashed border-cocoa/15 pt-3"
+            hidden
+          >
+            <div class="flex items-baseline justify-between text-cocoa-soft">
+              <span>Bars</span>
+              <span id="summary-bars" class="font-bold tabular-nums"></span>
+            </div>
+            <div class="mt-1 flex items-baseline justify-between">
+              <span class="font-display text-xl font-semibold text-cocoa">Total</span>
+              <span
+                id="summary-total"
+                class="font-display text-3xl font-bold text-cocoa tabular-nums"
+              ></span>
+            </div>
+            <p id="summary-box-hint" class="mt-2 text-sm text-cocoa-soft"></p>
+          </div>
+        </div>
+
+        <CheckoutForm />
+      </aside>
+    </div>
+
+    <section
+      id="confirmation"
+      class="mx-auto max-w-xl"
+      tabindex="-1"
+      aria-labelledby="confirmation-title"
+      hidden
+    >
+      <div class="card p-6 text-center sm:p-10">
+        <div
+          class="mx-auto flex size-16 items-center justify-center rounded-full bg-honey-soft text-3xl"
+          aria-hidden="true"
+        >
+          ✓
+        </div>
+        <h2 id="confirmation-title" class="mt-4 text-3xl font-bold sm:text-4xl">
+          Thank you!
+        </h2>
+        <p class="mt-2 text-lg text-cocoa-soft">Your order has been received.</p>
+        <p class="mt-6 text-sm font-bold tracking-wide text-cocoa-soft uppercase">Order number</p>
+        <p
+          id="confirmation-number"
+          class="font-display text-3xl font-bold tracking-wider text-berry select-all"
+        ></p>
+        <ul id="confirmation-lines" class="mt-6 divide-y divide-cocoa/10 text-left"></ul>
+        <div class="mt-3 flex items-baseline justify-between border-t-2 border-dashed border-cocoa/15 pt-3 text-left">
+          <span class="font-display text-xl font-semibold text-cocoa">
+            Total · <span id="confirmation-bars"></span>
+          </span>
+          <span
+            id="confirmation-total"
+            class="font-display text-2xl font-bold text-cocoa tabular-nums"
+          ></span>
+        </div>
+        <p class="mt-6 rounded-2xl bg-cream p-4 text-left text-cocoa">
+          Our family will reach out by phone to arrange delivery and payment. Please keep your order
+          number handy. No payment is needed right now.
+        </p>
+        <button type="button" id="new-order" class="btn-secondary mt-6">
+          Place another order
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <div
+    id="mobile-bar"
+    class="fixed inset-x-0 bottom-0 z-10 border-t border-cocoa/10 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden"
+    hidden
+  >
+    <div class="mx-auto flex max-w-xl items-center justify-between gap-4">
+      <div>
+        <p id="mobile-bars" class="text-sm font-bold text-cocoa-soft"></p>
+        <p
+          id="mobile-total"
+          class="font-display text-2xl leading-tight font-bold text-cocoa tabular-nums"
+        ></p>
+      </div>
+      <a href="#checkout-form" class="btn-primary">
+        Checkout
+      </a>
+    </div>
+  </div>
+
+  <footer class="px-4 pt-4 pb-10 text-center text-sm text-cocoa-soft">
+    <p>Questions? Just ask the family who shared this page with you.</p>
+  </footer>
+
+  <template id="product-template">
+    <li class="product-card card flex flex-col p-5 transition-shadow">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span
+            class="product-swatch size-10 shrink-0 rounded-full ring-4 ring-cream"
+            aria-hidden="true"
+          ></span>
+          <h3 class="product-name text-xl leading-tight font-semibold"></h3>
+        </div>
+        <span class="product-badge badge shrink-0" hidden></span>
+      </div>
+      <p class="product-description mt-3 flex-1 text-cocoa-soft"></p>
+      <div class="mt-4 flex items-center justify-between gap-3">
+        <span class="product-price font-display text-lg font-semibold whitespace-nowrap text-cocoa"></span>
+        <div class="product-stepper flex items-center gap-2">
+          <button type="button" class="product-minus stepper-button">
+            −
+          </button>
+          <input
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="1"
+            class="product-quantity h-11 w-14 rounded-xl border border-cocoa/20 bg-white text-center font-display text-lg font-semibold text-cocoa tabular-nums [appearance:textfield] focus:border-berry focus:outline-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          <button type="button" class="product-plus stepper-button">
+            +
+          </button>
+        </div>
+      </div>
+    </li>
+  </template>
+
+  <noscript>
+    <p class="mx-auto max-w-xl px-4 pb-10 text-center font-bold text-cocoa">
+      Please enable JavaScript to place an order.
+    </p>
+  </noscript>
+</BaseLayout>
+
+<script>
+  import '../scripts/storefront';
+</script>

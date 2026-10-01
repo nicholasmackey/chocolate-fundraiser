@@ -1,0 +1,255 @@
+---
+import AdminLayout from '../../components/admin/AdminLayout.astro';
+---
+
+<AdminLayout title="Inventory" current="inventory">
+  <h1 class="text-3xl font-bold">Inventory</h1>
+  <p class="mt-1 max-w-2xl text-cocoa-soft">
+    “Available” is what customers can still order. Bars in new or packed orders are already reserved
+    and have been taken out of available stock.
+  </p>
+
+  <ul id="inventory-list" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3"></ul>
+
+  <section class="card mt-8 p-5" aria-labelledby="history-title">
+    <h2 id="history-title" class="text-xl font-semibold">
+      Stock history
+    </h2>
+    <p id="history-empty" class="mt-2 text-cocoa-soft" hidden>
+      No changes yet.
+    </p>
+    <div class="mt-2 overflow-x-auto">
+      <table class="w-full min-w-[36rem] text-left text-sm">
+        <thead class="text-cocoa-soft">
+          <tr>
+            <th class="py-2 pr-3 font-bold">When</th>
+            <th class="py-2 pr-3 font-bold">Flavor</th>
+            <th class="py-2 pr-3 text-right font-bold">Change</th>
+            <th class="py-2 pr-3 text-right font-bold">After</th>
+            <th class="py-2 font-bold">Reason</th>
+          </tr>
+        </thead>
+        <tbody id="history-rows" class="divide-y divide-cocoa/10"></tbody>
+      </table>
+    </div>
+  </section>
+</AdminLayout>
+
+<script>
+  import { byId, formatDateTime, h } from '../../lib/client/dom';
+  import { adminGet, adminPost } from '../../scripts/admin/session';
+  import { errorMessage, toast, withButton } from '../../scripts/admin/ui';
+
+  interface InventoryRow {
+    id: number;
+    name: string;
+    stockQuantity: number;
+    lowStockThreshold: number;
+    reservedQuantity: number;
+    deliveredQuantity: number;
+  }
+
+  interface Adjustment {
+    id: number;
+    productName: string;
+    quantityChange: number;
+    quantityAfter: number;
+    reason: string;
+    note: string;
+    orderNumber: string | null;
+    createdAt: string;
+  }
+
+  const REASONS: Record<string, string> = {
+    admin_set: 'Count set',
+    admin_adjust: 'Adjusted',
+    order: 'Order',
+    cancellation: 'Cancelled order',
+  };
+
+  function numberField(
+    id: string,
+    label: string,
+    value: string,
+    attrs: Record<string, string | number> = {},
+  ) {
+    return h('div', {}, [
+      h('label', { className: 'field-label text-xs', text: label, attrs: { for: id } }),
+      h('input', {
+        className: 'field-input min-h-11 text-center font-display text-lg tabular-nums',
+        attrs: {
+          id,
+          type: 'number',
+          inputmode: 'numeric',
+          step: 1,
+          value,
+          required: true,
+          ...attrs,
+        },
+      }),
+    ]);
+  }
+
+  function inventoryCard(product: InventoryRow): HTMLElement {
+    const soldOut = product.stockQuantity === 0;
+    const low = !soldOut && product.stockQuantity <= product.lowStockThreshold;
+    const badge = soldOut
+      ? h('span', { className: 'badge bg-cocoa/10 text-cocoa-soft', text: 'Sold Out' })
+      : low
+        ? h('span', { className: 'badge bg-honey text-cocoa-ink', text: 'Going Fast' })
+        : null;
+
+    const setForm = h(
+      'form',
+      { className: 'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2' },
+      [
+        numberField(`set-${product.id}`, 'Set available count', String(product.stockQuantity), {
+          min: 0,
+          max: 100000,
+        }),
+        h('button', {
+          className: 'btn-secondary min-h-11 px-4 text-sm',
+          text: 'Save',
+          attrs: { type: 'submit' },
+        }),
+      ],
+    );
+    setForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const button = setForm.querySelector('button')!;
+      const quantity = Number(byId<HTMLInputElement>(`set-${product.id}`).value);
+      void withButton(button, async () => {
+        await adminPost(`/api/admin/inventory/${product.id}/set`, {
+          quantity,
+          note: 'Count updated',
+        });
+        toast(`${product.name} set to ${quantity}.`);
+        await load();
+      });
+    });
+
+    const adjustForm = h(
+      'form',
+      { className: 'grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-2' },
+      [
+        numberField(`adjust-${product.id}`, 'Add or remove bars', '40', { min: 1, max: 100000 }),
+        h('button', {
+          className: 'btn-secondary min-h-11 px-4 text-sm',
+          text: '+ Add',
+          attrs: { type: 'submit', value: 'add' },
+        }),
+        h('button', {
+          className: 'btn-secondary min-h-11 px-4 text-sm',
+          text: '− Remove',
+          attrs: { type: 'submit', value: 'remove' },
+        }),
+      ],
+    );
+    adjustForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const button =
+        (event.submitter as HTMLButtonElement | null) ?? adjustForm.querySelector('button')!;
+      const amount = Number(byId<HTMLInputElement>(`adjust-${product.id}`).value);
+      const delta = button.value === 'remove' ? -amount : amount;
+      void withButton(button, async () => {
+        await adminPost(`/api/admin/inventory/${product.id}/adjust`, {
+          delta,
+          note: delta > 0 ? 'Bars added' : 'Bars removed',
+        });
+        toast(`${product.name}: ${delta > 0 ? '+' : ''}${delta}`);
+        await load();
+      });
+    });
+
+    const thresholdForm = h(
+      'form',
+      { className: 'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2' },
+      [
+        numberField(
+          `threshold-${product.id}`,
+          '“Going Fast” at or below',
+          String(product.lowStockThreshold),
+          { min: 0, max: 10000 },
+        ),
+        h('button', {
+          className: 'btn-secondary min-h-11 px-4 text-sm',
+          text: 'Save',
+          attrs: { type: 'submit' },
+        }),
+      ],
+    );
+    thresholdForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const button = thresholdForm.querySelector('button')!;
+      const threshold = Number(byId<HTMLInputElement>(`threshold-${product.id}`).value);
+      void withButton(button, async () => {
+        await adminPost(`/api/admin/inventory/${product.id}/threshold`, { threshold });
+        toast(`${product.name} threshold saved.`);
+        await load();
+      });
+    });
+
+    return h(
+      'li',
+      { className: `card p-5 ${soldOut ? 'border-cocoa/20' : low ? 'border-honey' : ''}` },
+      [
+        h('div', { className: 'flex items-start justify-between gap-2' }, [
+          h('h2', { className: 'text-xl font-semibold', text: product.name }),
+          badge,
+        ]),
+        h('dl', { className: 'mt-3 grid grid-cols-3 gap-2 text-center' }, [
+          ...[
+            ['Available', product.stockQuantity, 'text-cocoa'],
+            ['Reserved', product.reservedQuantity, 'text-cocoa-soft'],
+            ['Delivered', product.deliveredQuantity, 'text-cocoa-soft'],
+          ].map(([label, value, color]) =>
+            h('div', { className: 'rounded-2xl bg-cream p-2' }, [
+              h('dt', { className: 'text-xs font-bold text-cocoa-soft', text: String(label) }),
+              h('dd', {
+                className: `font-display text-2xl font-bold tabular-nums ${color}`,
+                text: String(value),
+              }),
+            ]),
+          ),
+        ]),
+        h('div', { className: 'mt-4 grid gap-3' }, [setForm, adjustForm, thresholdForm]),
+      ],
+    );
+  }
+
+  function historyRow(adjustment: Adjustment): HTMLElement {
+    const reason = REASONS[adjustment.reason] ?? adjustment.reason;
+    const detail = adjustment.orderNumber ?? adjustment.note;
+    return h('tr', {}, [
+      h('td', {
+        className: 'py-2 pr-3 whitespace-nowrap text-cocoa-soft',
+        text: formatDateTime(adjustment.createdAt),
+      }),
+      h('td', { className: 'py-2 pr-3 font-bold text-cocoa', text: adjustment.productName }),
+      h('td', {
+        className: `py-2 pr-3 text-right font-bold tabular-nums ${adjustment.quantityChange > 0 ? 'text-emerald-700' : 'text-berry-dark'}`,
+        text: `${adjustment.quantityChange > 0 ? '+' : ''}${adjustment.quantityChange}`,
+      }),
+      h('td', {
+        className: 'py-2 pr-3 text-right tabular-nums',
+        text: String(adjustment.quantityAfter),
+      }),
+      h('td', { className: 'py-2', text: detail ? `${reason} · ${detail}` : reason }),
+    ]);
+  }
+
+  async function load(): Promise<void> {
+    try {
+      const data = await adminGet<{ inventory: InventoryRow[]; adjustments: Adjustment[] }>(
+        '/api/admin/inventory',
+      );
+      byId('inventory-list').replaceChildren(...data.inventory.map(inventoryCard));
+      byId('history-empty').hidden = data.adjustments.length > 0;
+      byId('history-rows').replaceChildren(...data.adjustments.map(historyRow));
+    } catch (error) {
+      toast(errorMessage(error), 'error');
+    }
+  }
+
+  void load();
+</script>

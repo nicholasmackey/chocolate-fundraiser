@@ -1,0 +1,36 @@
+---
+import { Font } from 'astro:assets';
+import '../styles/global.css';
+import { withBase } from '../lib/client/paths';
+
+interface Props {
+  title: string;
+  description?: string;
+  noindex?: boolean;
+}
+
+const {
+  title,
+  description = 'Support our school by ordering World’s Finest® Chocolate bars.',
+  noindex = false,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#FAF7EF" />
+    {noindex && <meta name="robots" content="noindex, nofollow, noarchive" />}
+    <link rel="icon" type="image/svg+xml" href={withBase('favicon.svg')} />
+    <Font cssVariable="--font-fredoka" preload />
+    <Font cssVariable="--font-nunito" preload />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-dvh">
+    <slot />
+  </body>
+</html>

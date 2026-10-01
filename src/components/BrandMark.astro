@@ -1,0 +1,19 @@
+---
+// Official World's Finest® Chocolate header logo, used unmodified.
+// Designed for a light background.
+import logoUrl from '../assets/brand/logo.svg?url';
+
+interface Props {
+  class?: string;
+}
+
+const { class: className = '' } = Astro.props;
+---
+
+<img
+  src={logoUrl}
+  width="1014"
+  height="429"
+  alt="Wyatt’s Finest Chocolate (World’s Finest® Chocolate)"
+  class:list={['h-auto', className]}
+/>

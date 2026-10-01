@@ -1,7 +1,7 @@
 {
   "name": "chocolate-fundraiser",
   "type": "module",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -9,12 +9,38 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "api:dev": "wrangler dev --port 8787",
+    "api:types": "wrangler types worker/worker-configuration.d.ts --include-env=false",
+    "api:deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:seed:local": "wrangler d1 execute DB --local --file=seed/seed.sql",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:seed:remote": "wrangler d1 execute DB --remote --file=seed/seed.sql",
+    "db:setup:local": "pnpm db:migrate:local && pnpm db:seed:local",
+    "hash-password": "node scripts/hash-password.ts",
+    "typecheck": "pnpm api:types && astro check && tsc -p worker/tsconfig.json",
+    "test": "pnpm api:types && vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
-    "astro": "^7.3.5"
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.3.5",
+    "tailwindcss": "^4.3.3"
   },
   "allowScripts": {
     "esbuild": true
-  }
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/node": "^22.20.4",
+    "prettier": "^3.9.9",
+    "prettier-plugin-astro": "^1.1.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.146.0"
+  },
+  "packageManager": "pnpm@10.28.2"
 }

@@ -1,0 +1,32 @@
+{
+  // Cloudflare Worker that hosts the fundraiser API and owns the D1 database.
+  // The storefront and admin UI are static files deployed to GitHub Pages.
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "chocolate-fundraiser-api",
+  "main": "worker/src/index.ts",
+  "account_id": "25bda66dbb4ba22b628a383f46463cb1",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "observability": {
+    "enabled": true,
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chocolate-fundraiser",
+      "database_id": "1fbfc4cb-c5a4-4ae5-9c16-aa00d5f992b7",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "vars": {
+    // Comma-separated browser origins allowed to call the API (scheme + host, no path).
+    // For GitHub Pages this is e.g. "https://your-username.github.io".
+    // Overridden locally by .dev.vars.
+    "ALLOWED_ORIGINS": "https://nicholasmackey.github.io",
+    // Optional: hostname Turnstile tokens must be issued for (e.g. "your-username.github.io").
+    // Leave empty to skip the hostname check.
+    "TURNSTILE_EXPECTED_HOSTNAME": "nicholasmackey.github.io",
+  },
+  // Secrets (set with `wrangler secret put <NAME>`, or in .dev.vars locally):
+  //   ADMIN_PASSWORD_HASH, SESSION_SECRET, TURNSTILE_SECRET_KEY
+}

@@ -1,0 +1,65 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { withBase } from '../../lib/client/paths';
+
+interface Props {
+  title: string;
+  current: 'dashboard' | 'orders' | 'inventory' | 'data';
+}
+
+const { title, current } = Astro.props;
+const links = [
+  { id: 'dashboard', label: 'Dashboard', href: withBase('admin/') },
+  { id: 'orders', label: 'Orders', href: withBase('admin/orders/') },
+  { id: 'inventory', label: 'Inventory', href: withBase('admin/inventory/') },
+  { id: 'data', label: 'Data', href: withBase('admin/data/') },
+] as const;
+---
+
+<BaseLayout title={`${title} · Fundraiser Admin`} noindex>
+  <header class="border-b border-cocoa/10 bg-white">
+    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+      <a href={withBase('admin/')} class="font-display text-xl font-bold text-cocoa">
+        Fundraiser Admin
+      </a>
+      <button type="button" id="sign-out" class="btn-quiet min-h-9 text-sm sm:order-last">
+        Sign out
+      </button>
+      <nav
+        class="-mx-4 w-[calc(100%+2rem)] overflow-x-auto px-4 sm:mx-0 sm:ml-auto sm:w-auto sm:px-0"
+        aria-label="Admin"
+      >
+        <ul class="flex gap-1">
+          {links.map((link) => (
+            <li>
+              <a
+                href={link.href}
+                aria-current={link.id === current ? 'page' : undefined}
+                class:list={[
+                  'block rounded-full px-4 py-2 font-bold whitespace-nowrap transition-colors',
+                  link.id === current ? 'bg-cocoa text-white' : 'text-cocoa hover:bg-cocoa/5',
+                ]}
+              >
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="admin-main" class="mx-auto max-w-6xl px-4 py-6 sm:py-8" hidden>
+    <slot />
+  </main>
+
+  <div id="admin-toast" role="status" aria-live="polite" hidden></div>
+</BaseLayout>
+
+<script>
+  import { readSession, redirectToLogin, signOut } from '../../scripts/admin/session';
+
+  if (!readSession()) redirectToLogin();
+  document.getElementById('admin-main')!.hidden = false;
+  document.getElementById('sign-out')!.addEventListener('click', () => void signOut());
+</script>

@@ -8,6 +8,9 @@ astro dev --background
 
 Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
+The site is static (GitHub Pages). The API is a separate Cloudflare Worker in `worker/` with a D1
+database; run it with `pnpm api:dev` (port 8787). See README.md for setup.
+
 ## Documentation
 
 Full documentation: https://docs.astro.build

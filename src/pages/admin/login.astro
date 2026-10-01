@@ -1,0 +1,68 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Sign in · Fundraiser Admin" noindex>
+  <main class="flex min-h-dvh items-center justify-center px-4 py-10">
+    <form id="login-form" class="card w-full max-w-sm p-6 sm:p-8">
+      <h1 class="text-3xl font-bold">Fundraiser Admin</h1>
+      <p class="mt-1 text-cocoa-soft">Sign in to manage orders and inventory.</p>
+      <label for="password" class="field-label mt-6">
+        Password
+      </label>
+      <input
+        id="password"
+        name="password"
+        type="password"
+        class="field-input"
+        autocomplete="current-password"
+        required
+      />
+      <p id="login-error" class="field-error" role="alert" hidden></p>
+      <button type="submit" id="login-submit" class="btn-primary mt-6 w-full">
+        Sign in
+      </button>
+    </form>
+  </main>
+</BaseLayout>
+
+<script>
+  import { apiJson } from '../../lib/client/api';
+  import { byId } from '../../lib/client/dom';
+  import { withBase } from '../../lib/client/paths';
+  import { readSession, saveSession } from '../../scripts/admin/session';
+  import { errorMessage } from '../../scripts/admin/ui';
+
+  const form = byId<HTMLFormElement>('login-form');
+  const password = byId<HTMLInputElement>('password');
+  const errorText = byId('login-error');
+  const submit = byId<HTMLButtonElement>('login-submit');
+
+  function nextPath(): string {
+    const next = new URLSearchParams(location.search).get('next') ?? '';
+    // Only allow same-site admin paths, never an external URL.
+    return next.startsWith(withBase('admin/')) && !next.startsWith('//')
+      ? next
+      : withBase('admin/');
+  }
+
+  if (readSession()) location.replace(nextPath());
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    errorText.hidden = true;
+    submit.disabled = true;
+    try {
+      const session = await apiJson<{ token: string; expiresAt: string }>('/api/admin/login', {
+        body: { password: password.value },
+      });
+      saveSession(session);
+      location.replace(nextPath());
+    } catch (error) {
+      errorText.textContent = errorMessage(error);
+      errorText.hidden = false;
+      password.select();
+      submit.disabled = false;
+    }
+  });
+</script>

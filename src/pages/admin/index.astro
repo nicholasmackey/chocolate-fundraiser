@@ -1,0 +1,258 @@
+---
+import AdminLayout from '../../components/admin/AdminLayout.astro';
+import { withBase } from '../../lib/client/paths';
+---
+
+<AdminLayout title="Dashboard" current="dashboard">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <h1 class="text-3xl font-bold">Dashboard</h1>
+    <div class="card flex items-center gap-3 py-2 pr-2 pl-4">
+      <span class="font-bold text-cocoa">Public ordering</span>
+      <span id="ordering-state" class="badge bg-cocoa/10 text-cocoa">
+        …
+      </span>
+      <button
+        type="button"
+        id="ordering-toggle"
+        class="btn-secondary min-h-9 px-4 text-sm"
+        disabled
+      >
+        …
+      </button>
+    </div>
+  </div>
+
+  <dl class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-busy="true" id="metrics">
+    <div class="card p-4 sm:p-5">
+      <dt class="text-sm font-bold text-cocoa-soft">Total Orders</dt>
+      <dd
+        id="metric-orders"
+        class="mt-1 font-display text-3xl font-bold text-cocoa tabular-nums sm:text-4xl"
+      >
+        –
+      </dd>
+      <dd id="metric-orders-sub" class="text-sm text-cocoa-soft"></dd>
+    </div>
+    <div class="card p-4 sm:p-5">
+      <dt class="text-sm font-bold text-cocoa-soft">Total Bars Remaining</dt>
+      <dd
+        id="metric-bars"
+        class="mt-1 font-display text-3xl font-bold text-cocoa tabular-nums sm:text-4xl"
+      >
+        –
+      </dd>
+      <dd id="metric-bars-sub" class="text-sm text-cocoa-soft"></dd>
+    </div>
+    <div class="card p-4 sm:p-5">
+      <dt class="text-sm font-bold text-cocoa-soft">Total Sales Value</dt>
+      <dd
+        id="metric-sales"
+        class="mt-1 font-display text-3xl font-bold text-cocoa tabular-nums sm:text-4xl"
+      >
+        –
+      </dd>
+      <dd id="metric-sales-sub" class="text-sm text-cocoa-soft"></dd>
+    </div>
+    <div class="card p-4 sm:p-5">
+      <dt class="text-sm font-bold text-cocoa-soft">Orders Awaiting Delivery</dt>
+      <dd
+        id="metric-awaiting"
+        class="mt-1 font-display text-3xl font-bold text-berry tabular-nums sm:text-4xl"
+      >
+        –
+      </dd>
+      <dd class="text-sm text-cocoa-soft">New or packed</dd>
+    </div>
+  </dl>
+
+  <section
+    id="low-stock"
+    class="card mt-6 border-honey/60 bg-honey-soft/50 p-5"
+    aria-labelledby="low-stock-title"
+    hidden
+  >
+    <h2 id="low-stock-title" class="text-xl font-semibold">
+      Low stock
+    </h2>
+    <ul id="low-stock-list" class="mt-2 flex flex-wrap gap-2"></ul>
+  </section>
+
+  <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <section class="card p-5" aria-labelledby="recent-title">
+      <div class="flex items-center justify-between">
+        <h2 id="recent-title" class="text-xl font-semibold">
+          Recent orders
+        </h2>
+        <a href={withBase('admin/orders/')} class="font-bold text-berry hover:underline">
+          View all
+        </a>
+      </div>
+      <p id="recent-empty" class="mt-3 text-cocoa-soft" hidden>
+        No orders yet.
+      </p>
+      <ul id="recent-list" class="mt-2 divide-y divide-cocoa/10"></ul>
+    </section>
+
+    <section class="card p-5" aria-labelledby="inventory-title">
+      <div class="flex items-center justify-between">
+        <h2 id="inventory-title" class="text-xl font-semibold">
+          Inventory
+        </h2>
+        <a href={withBase('admin/inventory/')} class="font-bold text-berry hover:underline">
+          Manage
+        </a>
+      </div>
+      <table class="mt-2 w-full text-left">
+        <thead class="text-sm text-cocoa-soft">
+          <tr>
+            <th class="py-2 font-bold">Flavor</th>
+            <th class="py-2 text-right font-bold">Available</th>
+            <th class="py-2 text-right font-bold">Reserved</th>
+          </tr>
+        </thead>
+        <tbody id="inventory-rows" class="divide-y divide-cocoa/10"></tbody>
+      </table>
+    </section>
+  </div>
+</AdminLayout>
+
+<script>
+  import { formatCents } from '../../../shared/pricing';
+  import type { Order } from '../../../shared/types';
+  import { byId, formatDateTime, h } from '../../lib/client/dom';
+  import { adminGet, adminPost } from '../../scripts/admin/session';
+  import {
+    errorMessage,
+    paymentBadge,
+    statusBadge,
+    toast,
+    withButton,
+  } from '../../scripts/admin/ui';
+
+  interface InventoryRow {
+    id: number;
+    name: string;
+    stockQuantity: number;
+    lowStockThreshold: number;
+    reservedQuantity: number;
+  }
+
+  interface Dashboard {
+    metrics: {
+      totalOrders: number;
+      cancelledOrders: number;
+      awaitingDelivery: number;
+      salesCents: number;
+      paidCents: number;
+      barsSold: number;
+      barsRemaining: number;
+    };
+    orderingEnabled: boolean;
+    inventory: InventoryRow[];
+    lowStock: InventoryRow[];
+    recentOrders: Order[];
+  }
+
+  let orderingEnabled = false;
+  const toggle = byId<HTMLButtonElement>('ordering-toggle');
+
+  function renderOrdering(): void {
+    const state = byId('ordering-state');
+    state.textContent = orderingEnabled ? 'Open' : 'Closed';
+    state.className = `badge ${orderingEnabled ? 'bg-emerald-100 text-emerald-800' : 'bg-cocoa/10 text-cocoa'}`;
+    toggle.textContent = orderingEnabled ? 'Close ordering' : 'Open ordering';
+    toggle.disabled = false;
+  }
+
+  function render(data: Dashboard): void {
+    const { metrics } = data;
+    byId('metric-orders').textContent = String(metrics.totalOrders);
+    byId('metric-orders-sub').textContent = metrics.cancelledOrders
+      ? `${metrics.cancelledOrders} cancelled`
+      : '';
+    byId('metric-bars').textContent = String(metrics.barsRemaining);
+    byId('metric-bars-sub').textContent = `${metrics.barsSold} sold`;
+    byId('metric-sales').textContent = formatCents(metrics.salesCents);
+    byId('metric-sales-sub').textContent = `${formatCents(metrics.paidCents)} paid`;
+    byId('metric-awaiting').textContent = String(metrics.awaitingDelivery);
+    byId('metrics').removeAttribute('aria-busy');
+
+    orderingEnabled = data.orderingEnabled;
+    renderOrdering();
+
+    byId('low-stock').hidden = data.lowStock.length === 0;
+    byId('low-stock-list').replaceChildren(
+      ...data.lowStock.map((product) =>
+        h('li', {
+          className: 'badge bg-white px-3 py-1 text-sm normal-case text-cocoa',
+          text:
+            product.stockQuantity === 0
+              ? `${product.name}: sold out`
+              : `${product.name}: ${product.stockQuantity} left`,
+        }),
+      ),
+    );
+
+    byId('recent-empty').hidden = data.recentOrders.length > 0;
+    byId('recent-list').replaceChildren(
+      ...data.recentOrders.map((order) =>
+        h('li', { className: 'flex flex-wrap items-center justify-between gap-2 py-3' }, [
+          h('div', {}, [
+            h('p', { className: 'font-bold text-cocoa' }, [
+              order.customerName,
+              h('span', { className: 'ml-2 font-normal text-cocoa-soft', text: order.orderNumber }),
+            ]),
+            h('p', {
+              className: 'text-sm text-cocoa-soft',
+              text: `${formatDateTime(order.createdAt)} · ${order.totalBars} bars · ${formatCents(order.totalCents)}`,
+            }),
+          ]),
+          h('div', { className: 'flex gap-1' }, [
+            statusBadge(order.status),
+            paymentBadge(order.paymentStatus),
+          ]),
+        ]),
+      ),
+    );
+
+    byId('inventory-rows').replaceChildren(
+      ...data.inventory.map((product) =>
+        h('tr', {}, [
+          h('td', { className: 'py-2 font-bold text-cocoa', text: product.name }),
+          h('td', {
+            className: `py-2 text-right tabular-nums ${product.stockQuantity <= product.lowStockThreshold ? 'font-bold text-berry' : ''}`,
+            text: product.stockQuantity === 0 ? 'Sold out' : String(product.stockQuantity),
+          }),
+          h('td', {
+            className: 'py-2 text-right text-cocoa-soft tabular-nums',
+            text: String(product.reservedQuantity),
+          }),
+        ]),
+      ),
+    );
+  }
+
+  async function load(): Promise<void> {
+    try {
+      render(await adminGet<Dashboard>('/api/admin/dashboard'));
+    } catch (error) {
+      toast(errorMessage(error), 'error');
+    }
+  }
+
+  toggle.addEventListener('click', () =>
+    withButton(toggle, async () => {
+      const next = !orderingEnabled;
+      if (!next && !confirm('Close public ordering? Customers will not be able to place orders.'))
+        return;
+      const result = await adminPost<{ orderingEnabled: boolean }>('/api/admin/settings/ordering', {
+        enabled: next,
+      });
+      orderingEnabled = result.orderingEnabled;
+      renderOrdering();
+      toast(orderingEnabled ? 'Ordering is open.' : 'Ordering is closed.');
+    }),
+  );
+
+  void load();
+</script>

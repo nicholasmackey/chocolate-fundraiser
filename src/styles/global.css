@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-cream: #faf7ef;
+  --color-cream-deep: #f3ecdc;
+  --color-cocoa: #673d39;
+  --color-cocoa-soft: #8a5f5a;
+  --color-cocoa-ink: #3f2421;
+  --color-berry: #e40061;
+  --color-berry-dark: #b8004e;
+  --color-honey: #f4a340;
+  --color-honey-soft: #fde9cc;
+
+  --font-display: var(--font-fredoka);
+  --font-sans: var(--font-nunito);
+
+  --radius-card: 1.5rem;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    scroll-padding-top: 1rem;
+  }
+
+  body {
+    @apply bg-cream font-sans text-cocoa-ink antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display text-cocoa;
+  }
+
+  :focus-visible {
+    @apply outline-3 outline-offset-2 outline-berry;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility card {
+  @apply rounded-[var(--radius-card)] border border-cocoa/10 bg-white shadow-[0_1px_0_rgb(103_61_57/0.06)];
+}
+
+@utility btn {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 font-display text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@utility btn-primary {
+  @apply btn bg-berry text-white hover:bg-berry-dark;
+}
+
+@utility btn-secondary {
+  @apply btn border border-cocoa/20 bg-white text-cocoa hover:border-cocoa/40 hover:bg-cream;
+}
+
+@utility btn-quiet {
+  @apply btn px-3 text-cocoa hover:bg-cocoa/5;
+}
+
+@utility field-label {
+  @apply mb-1.5 block text-sm font-bold text-cocoa;
+}
+
+@utility field-input {
+  @apply block min-h-12 w-full rounded-2xl border border-cocoa/20 bg-white px-4 py-2.5 text-base text-cocoa-ink placeholder:text-cocoa/40 transition-colors focus:border-berry focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-0 aria-invalid:border-berry aria-invalid:bg-berry/5;
+}
+
+@utility field-error {
+  @apply mt-1 text-sm font-semibold text-berry;
+}
+
+@utility badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wide uppercase;
+}
+
+@utility stepper-button {
+  @apply flex size-11 items-center justify-center rounded-full border border-cocoa/20 bg-white font-display text-2xl leading-none text-cocoa transition-colors hover:border-berry hover:text-berry disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-cocoa/20 disabled:hover:text-cocoa;
+}

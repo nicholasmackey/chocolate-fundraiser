@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { withBase } from '../lib/client/paths';
+---
+
+<BaseLayout title="Page not found">
+  <main class="flex min-h-dvh flex-col items-center justify-center px-4 text-center">
+    <h1 class="text-4xl font-bold">Page not found</h1>
+    <p class="mt-2 text-cocoa-soft">The page you’re looking for doesn’t exist.</p>
+    <a href={withBase()} class="btn-primary mt-6">
+      Back to the shop
+    </a>
+  </main>
+</BaseLayout>

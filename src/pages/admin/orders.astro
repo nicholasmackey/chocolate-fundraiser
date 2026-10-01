@@ -1,0 +1,320 @@
+---
+import AdminLayout from '../../components/admin/AdminLayout.astro';
+
+const filters = [
+  ['open', 'Open'],
+  ['all', 'All'],
+  ['new', 'New'],
+  ['packed', 'Packed'],
+  ['delivered', 'Delivered'],
+  ['cancelled', 'Cancelled'],
+] as const;
+---
+
+<AdminLayout title="Orders" current="orders">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-3xl font-bold">Orders</h1>
+    <button type="button" id="export-csv" class="btn-secondary">
+      Export CSV
+    </button>
+  </div>
+
+  <div class="mt-5 flex flex-col gap-3 md:flex-row md:items-center">
+    <label class="relative flex-1">
+      <span class="sr-only">Search orders</span>
+      <input
+        id="order-search"
+        type="search"
+        class="field-input"
+        placeholder="Search name, phone, address, or order #"
+        autocomplete="off"
+      />
+    </label>
+    <div
+      class="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0"
+      role="group"
+      aria-label="Filter by status"
+    >
+      <div class="flex gap-1">
+        {filters.map(([value, label]) => (
+          <button
+            type="button"
+            class="status-filter rounded-full px-4 py-2 font-bold whitespace-nowrap text-cocoa transition-colors hover:bg-cocoa/5 aria-pressed:bg-cocoa aria-pressed:text-white"
+            data-status={value}
+            aria-pressed="false"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+
+  <p id="orders-summary" class="mt-4 text-sm font-bold text-cocoa-soft" aria-live="polite"></p>
+  <p id="orders-empty" class="card mt-3 p-8 text-center text-cocoa-soft" hidden>
+    No orders match.
+  </p>
+
+  <ul id="order-cards" class="mt-3 grid gap-3 md:hidden"></ul>
+
+  <div class="card mt-3 hidden overflow-hidden md:block" id="order-table-wrap">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-cream-deep/60 text-cocoa">
+        <tr>
+          <th class="px-4 py-3 font-bold">Order</th>
+          <th class="px-4 py-3 font-bold">Customer</th>
+          <th class="px-4 py-3 font-bold">Delivery address</th>
+          <th class="px-4 py-3 font-bold">Items</th>
+          <th class="px-4 py-3 font-bold">Status</th>
+          <th class="px-4 py-3 font-bold">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="order-rows" class="divide-y divide-cocoa/10 align-top"></tbody>
+    </table>
+  </div>
+</AdminLayout>
+
+<script>
+  import {
+    CANCELLABLE_STATUSES,
+    STATUS_TRANSITIONS,
+    transitionLabel,
+  } from '../../../shared/order-status';
+  import { formatCents } from '../../../shared/pricing';
+  import type { Order } from '../../../shared/types';
+  import { byId, formatDateTime, h } from '../../lib/client/dom';
+  import { adminDownload, adminGet, adminPost } from '../../scripts/admin/session';
+  import {
+    errorMessage,
+    paymentBadge,
+    statusBadge,
+    toast,
+    withButton,
+  } from '../../scripts/admin/ui';
+
+  const params = new URLSearchParams(location.search);
+  let statusFilter = params.get('status') ?? 'open';
+  let query = params.get('q') ?? '';
+  let orders: Order[] = [];
+  let loadCounter = 0;
+
+  const search = byId<HTMLInputElement>('order-search');
+  search.value = query;
+
+  function itemsText(order: Order): string {
+    return order.items.map((item) => `${item.productName} × ${item.quantity}`).join(', ');
+  }
+
+  function addressLines(order: Order): string[] {
+    return [order.street, `${order.city}, ${order.state} ${order.zip}`];
+  }
+
+  function replaceOrder(updated: Order): void {
+    orders = orders.map((order) => (order.id === updated.id ? updated : order));
+    render();
+  }
+
+  function actionButton(
+    label: string,
+    className: string,
+    action: () => Promise<void>,
+  ): HTMLButtonElement {
+    const button = h('button', { className, text: label, attrs: { type: 'button' } });
+    button.addEventListener('click', () => withButton(button, action));
+    return button;
+  }
+
+  function orderActions(order: Order): HTMLElement {
+    const small = 'min-h-10 px-3 text-sm';
+    const buttons: HTMLElement[] = STATUS_TRANSITIONS[order.status].map((next) =>
+      actionButton(
+        transitionLabel(order.status, next),
+        `${next === 'delivered' || (next === 'packed' && order.status === 'new') ? 'btn-primary' : 'btn-secondary'} ${small}`,
+        async () => {
+          const result = await adminPost<{ order: Order }>(`/api/admin/orders/${order.id}/status`, {
+            status: next,
+          });
+          replaceOrder(result.order);
+          toast(`${order.orderNumber}: ${transitionLabel(order.status, next).toLowerCase()}`);
+        },
+      ),
+    );
+    const nextPayment = order.paymentStatus === 'paid' ? 'unpaid' : 'paid';
+    buttons.push(
+      actionButton(
+        nextPayment === 'paid' ? 'Mark paid' : 'Mark unpaid',
+        `btn-secondary ${small}`,
+        async () => {
+          const result = await adminPost<{ order: Order }>(
+            `/api/admin/orders/${order.id}/payment`,
+            {
+              paymentStatus: nextPayment,
+            },
+          );
+          replaceOrder(result.order);
+          toast(`${order.orderNumber}: marked ${nextPayment}`);
+        },
+      ),
+    );
+    if (CANCELLABLE_STATUSES.includes(order.status)) {
+      buttons.push(
+        actionButton('Cancel', `btn-quiet ${small} text-berry-dark`, async () => {
+          if (
+            !confirm(
+              `Cancel order ${order.orderNumber}? Its ${order.totalBars} bars will go back into inventory.`,
+            )
+          ) {
+            return;
+          }
+          const result = await adminPost<{ order: Order; restored: boolean }>(
+            `/api/admin/orders/${order.id}/cancel`,
+          );
+          replaceOrder(result.order);
+          toast(
+            result.restored
+              ? `${order.orderNumber} cancelled; stock restored.`
+              : `${order.orderNumber} was already cancelled.`,
+          );
+        }),
+      );
+    }
+    return h('div', { className: 'flex flex-wrap gap-2' }, buttons);
+  }
+
+  function phoneLink(order: Order): HTMLAnchorElement {
+    const digits = order.phone.replace(/\D/g, '');
+    return h('a', {
+      className: 'font-bold text-berry-dark hover:underline',
+      text: order.phone,
+      attrs: { href: `tel:+1${digits}` },
+    });
+  }
+
+  function orderCard(order: Order): HTMLElement {
+    return h('li', { className: 'card p-4' }, [
+      h('div', { className: 'flex items-start justify-between gap-3' }, [
+        h('div', {}, [
+          h('p', {
+            className: 'font-display text-lg font-semibold text-cocoa',
+            text: order.customerName,
+          }),
+          h('p', {
+            className: 'text-sm text-cocoa-soft',
+            text: `${order.orderNumber} · ${formatDateTime(order.createdAt)}`,
+          }),
+        ]),
+        h('div', { className: 'flex flex-col items-end gap-1' }, [
+          statusBadge(order.status),
+          paymentBadge(order.paymentStatus),
+        ]),
+      ]),
+      h('div', { className: 'mt-3 grid gap-1 text-sm' }, [
+        phoneLink(order),
+        ...addressLines(order).map((line) => h('p', { text: line })),
+        order.deliveryInstructions
+          ? h('p', {
+              className: 'mt-1 rounded-xl bg-cream p-2 whitespace-pre-line text-cocoa',
+              text: order.deliveryInstructions,
+            })
+          : null,
+      ]),
+      h('p', { className: 'mt-3 text-sm', text: itemsText(order) }),
+      h('p', {
+        className: 'mt-1 font-bold text-cocoa',
+        text: `${order.totalBars} bars · ${formatCents(order.totalCents)}`,
+      }),
+      h('div', { className: 'mt-3 border-t border-cocoa/10 pt-3' }, [orderActions(order)]),
+    ]);
+  }
+
+  function orderRow(order: Order): HTMLElement {
+    return h('tr', { className: order.status === 'cancelled' ? 'opacity-60' : '' }, [
+      h('td', { className: 'px-4 py-3' }, [
+        h('p', { className: 'font-bold text-cocoa', text: order.orderNumber }),
+        h('p', { className: 'text-cocoa-soft', text: formatDateTime(order.createdAt) }),
+      ]),
+      h('td', { className: 'px-4 py-3' }, [
+        h('p', { className: 'font-bold text-cocoa', text: order.customerName }),
+        phoneLink(order),
+      ]),
+      h('td', { className: 'px-4 py-3' }, [
+        ...addressLines(order).map((line) => h('p', { text: line })),
+        order.deliveryInstructions
+          ? h('p', {
+              className: 'mt-1 max-w-56 whitespace-pre-line text-cocoa-soft italic',
+              text: order.deliveryInstructions,
+            })
+          : null,
+      ]),
+      h('td', { className: 'px-4 py-3' }, [
+        ...order.items.map((item) => h('p', { text: `${item.productName} × ${item.quantity}` })),
+        h('p', {
+          className: 'mt-1 font-bold text-cocoa',
+          text: `${order.totalBars} bars · ${formatCents(order.totalCents)}`,
+        }),
+      ]),
+      h('td', { className: 'px-4 py-3' }, [
+        h('div', { className: 'flex flex-col items-start gap-1' }, [
+          statusBadge(order.status),
+          paymentBadge(order.paymentStatus),
+        ]),
+      ]),
+      h('td', { className: 'px-4 py-3' }, [orderActions(order)]),
+    ]);
+  }
+
+  function render(): void {
+    for (const button of document.querySelectorAll<HTMLButtonElement>('.status-filter')) {
+      button.setAttribute('aria-pressed', String(button.dataset.status === statusFilter));
+    }
+    const totalCents = orders
+      .filter((order) => order.status !== 'cancelled')
+      .reduce((sum, order) => sum + order.totalCents, 0);
+    byId('orders-summary').textContent =
+      `${orders.length} ${orders.length === 1 ? 'order' : 'orders'} · ${formatCents(totalCents)}`;
+    byId('orders-empty').hidden = orders.length > 0;
+    byId('order-table-wrap').classList.toggle('md:block', orders.length > 0);
+    byId('order-cards').replaceChildren(...orders.map(orderCard));
+    byId('order-rows').replaceChildren(...orders.map(orderRow));
+  }
+
+  async function load(): Promise<void> {
+    const requestId = ++loadCounter;
+    const searchParams = new URLSearchParams({ status: statusFilter });
+    if (query) searchParams.set('q', query);
+    history.replaceState(null, '', `${location.pathname}?${searchParams}`);
+    try {
+      const result = await adminGet<{ orders: Order[] }>(`/api/admin/orders?${searchParams}`);
+      if (requestId !== loadCounter) return;
+      orders = result.orders;
+      render();
+    } catch (error) {
+      toast(errorMessage(error), 'error');
+    }
+  }
+
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  search.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      query = search.value.trim();
+      void load();
+    }, 250);
+  });
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.status-filter')) {
+    button.addEventListener('click', () => {
+      statusFilter = button.dataset.status ?? 'all';
+      void load();
+    });
+  }
+
+  const exportButton = byId<HTMLButtonElement>('export-csv');
+  exportButton.addEventListener('click', () =>
+    withButton(exportButton, async () => {
+      await adminDownload('/api/admin/orders.csv');
+    }),
+  );
+
+  void load();
+</script>
