@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { handleRequest, type Dependencies } from '../worker/src/index';
+import type { OrderNotice } from '../worker/src/telegram';
 import {
   createTestContext,
   CUSTOMER,
@@ -10,7 +11,15 @@ import {
 
 let context: TestContext;
 let turnstileResult = true;
-const deps: Dependencies = { verifyTurnstile: async () => turnstileResult };
+let notifications: OrderNotice[] = [];
+let pending: Promise<unknown>[] = [];
+const deps: Dependencies = {
+  verifyTurnstile: async () => turnstileResult,
+  notifyNewOrder: async (_config, notice) => {
+    notifications.push(notice);
+  },
+  waitUntil: (promise) => pending.push(promise),
+};
 
 beforeAll(async () => {
   context = await createTestContext();
@@ -20,6 +29,8 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   turnstileResult = true;
+  notifications = [];
+  pending = [];
   await context.reset();
 });
 
@@ -218,6 +229,67 @@ describe('public API', () => {
     expect(body.order.totalCents).toBe(800);
     expect(body.order).not.toHaveProperty('customerName');
     expect(await context.stockOf('almond')).toBe(26);
+  });
+
+  it('sends one notification per new order, after the order is saved', async () => {
+    await context.openOrdering();
+    await context.setStockDirect('almond', 30);
+    const order = {
+      submissionId: crypto.randomUUID(),
+      turnstileToken: 'ok',
+      details: CUSTOMER,
+      items: [{ productId: await context.productId('almond'), quantity: 2 }],
+    };
+    expect((await call('/api/orders', { body: order })).status).toBe(201);
+    // A retried submission returns the original order without notifying again.
+    expect((await call('/api/orders', { body: order })).status).toBe(200);
+    await Promise.all(pending);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]!.details.phone).toBe(CUSTOMER.phone);
+    expect(notifications[0]!.confirmation.items).toEqual([
+      { productName: 'Almond', quantity: 2, lineTotalCents: 400 },
+    ]);
+  });
+
+  it('keeps the order and inventory when the notification fails', async () => {
+    await context.openOrdering();
+    await context.setStockDirect('almond', 30);
+    const failingDeps: Dependencies = {
+      ...deps,
+      notifyNewOrder: () => Promise.reject(new Error('Telegram is down')),
+      waitUntil: (promise) => pending.push(promise.catch(() => undefined)),
+    };
+    const request = new Request('https://api.example/api/orders', {
+      method: 'POST',
+      headers: { Origin: TEST_ORIGIN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        submissionId: crypto.randomUUID(),
+        turnstileToken: 'ok',
+        details: CUSTOMER,
+        items: [{ productId: await context.productId('almond'), quantity: 3 }],
+      }),
+    });
+    const response = await handleRequest(request, context.env, failingDeps);
+    await Promise.all(pending);
+    expect(response.status).toBe(201);
+    expect(await context.stockOf('almond')).toBe(27);
+    expect(await context.count('orders')).toBe(1);
+  });
+
+  it('requires a valid phone number', async () => {
+    for (const phone of ['', '555-0142', '(012) 555-0142']) {
+      const response = await call('/api/orders', {
+        body: {
+          submissionId: crypto.randomUUID(),
+          details: { ...CUSTOMER, phone },
+          items: [{ productId: await context.productId('almond'), quantity: 1 }],
+        },
+      });
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: { details: Record<string, string> } };
+      expect(body.error.details).toHaveProperty('phone');
+    }
+    expect(notifications).toHaveLength(0);
   });
 
   it('rejects orders that fail Turnstile', async () => {

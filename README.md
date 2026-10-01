@@ -104,6 +104,26 @@ Note the Worker URL it prints (e.g. `https://chocolate-fundraiser-api.<subdomain
 (e.g. `your-username.github.io`) and `localhost`. It gives you a site key (public) and a secret key
 (stored with `wrangler secret put` above).
 
+**Telegram order notifications (optional):** each new order is sent to a private Telegram chat after
+it is saved. The message has the customer name, a tappable phone number, the address, flavors, the
+total, the order number, and an Admin link (`ADMIN_URL` in `wrangler.jsonc`). Sending happens after
+the response, so a Telegram outage never affects orders. Logs record only the order number and HTTP
+status.
+
+1. In Telegram, message [@BotFather](https://t.me/BotFather), send `/newbot`, and copy the token.
+2. To notify one person, open the bot, tap **Start**, and send it any message. To notify several
+   people, create a private Telegram group with everyone who should get orders, then add the bot to
+   it (group → Add members → search the bot's @username).
+3. Run `pnpm telegram:setup` and paste the token. It prints your chat ID.
+4. Run `pnpm telegram:setup <chat-id>` to send a sample notification.
+5. Store both as secrets and deploy:
+
+```sh
+pnpm exec wrangler secret put TELEGRAM_BOT_TOKEN
+pnpm exec wrangler secret put TELEGRAM_CHAT_ID
+pnpm api:deploy
+```
+
 Later API deploys can run from GitHub instead: add the `CLOUDFLARE_API_TOKEN` (with the “Edit Cloudflare
 Workers” template plus D1 edit) and `CLOUDFLARE_ACCOUNT_ID` repository secrets, then run the
 **Deploy API Worker** workflow manually.

@@ -128,6 +128,7 @@ function renderProducts(): void {
         badge.textContent = 'Going Fast';
         badge.classList.add('bg-honey', 'text-cocoa-ink');
         badge.hidden = false;
+        card.querySelector<HTMLElement>('.product-hot')!.hidden = false;
       }
 
       const stepper = card.querySelector<HTMLElement>('.product-stepper')!;

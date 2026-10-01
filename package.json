@@ -22,7 +22,8 @@
     "typecheck": "pnpm api:types && astro check && tsc -p worker/tsconfig.json",
     "test": "pnpm api:types && vitest run",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "telegram:setup": "node scripts/telegram-setup.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

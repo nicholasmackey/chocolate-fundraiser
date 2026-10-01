@@ -12,3 +12,9 @@ TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
 
 # The local Astro dev server.
 ALLOWED_ORIGINS="http://localhost:4321"
+
+# Optional: Telegram order notifications. Leave unset to skip notifications locally.
+# Run `pnpm telegram:setup` to find your chat ID and send a test message.
+# TELEGRAM_BOT_TOKEN="123456789:REPLACE_WITH_BOT_TOKEN"
+# TELEGRAM_CHAT_ID="REPLACE_WITH_CHAT_ID"
+ADMIN_URL="http://localhost:4321/admin"

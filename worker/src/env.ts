@@ -10,4 +10,10 @@ export interface AppEnv {
   SESSION_SECRET: string;
   /** Secret: Turnstile server-side secret key. */
   TURNSTILE_SECRET_KEY: string;
+  /** Optional admin UI base URL, linked from order notifications. */
+  ADMIN_URL?: string;
+  /** Optional secret: Telegram bot token for new-order notifications. */
+  TELEGRAM_BOT_TOKEN?: string;
+  /** Optional secret: Telegram chat that receives new-order notifications. */
+  TELEGRAM_CHAT_ID?: string;
 }

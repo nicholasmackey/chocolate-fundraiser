@@ -6,7 +6,7 @@ import type { AppEnv } from '../env';
 import { ApiError, getClientIp, jsonResponse, readJsonObject } from '../http';
 import { logger } from '../logger';
 import { consumeRateLimit, ORDER_RATE_LIMIT } from '../rate-limit';
-import type { TurnstileVerifier } from '../turnstile';
+import type { Dependencies } from '../index';
 
 const SUBMISSION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -27,7 +27,7 @@ export async function getStorefront(env: AppEnv): Promise<Response> {
 export async function postOrder(
   request: Request,
   env: AppEnv,
-  verifyTurnstile: TurnstileVerifier,
+  deps: Dependencies,
 ): Promise<Response> {
   const body = await readJsonObject(request);
   const clientIp = getClientIp(request);
@@ -61,7 +61,7 @@ export async function postOrder(
   if (existing) return jsonResponse({ order: existing });
 
   const turnstileToken = typeof body.turnstileToken === 'string' ? body.turnstileToken : '';
-  const human = await verifyTurnstile({
+  const human = await deps.verifyTurnstile({
     token: turnstileToken,
     secretKey: env.TURNSTILE_SECRET_KEY,
     remoteIp: clientIp,
@@ -85,6 +85,18 @@ export async function postOrder(
       orderNumber: result.confirmation.orderNumber,
       totalBars: result.confirmation.totalBars,
     });
+    // The order and inventory are already committed. The notification runs after the
+    // response is sent, and notifyNewOrder never throws, so it cannot affect the order.
+    deps.waitUntil(
+      deps.notifyNewOrder(
+        {
+          botToken: env.TELEGRAM_BOT_TOKEN,
+          chatId: env.TELEGRAM_CHAT_ID,
+          adminUrl: env.ADMIN_URL,
+        },
+        { confirmation: result.confirmation, details: details.value },
+      ),
+    );
   }
   return jsonResponse({ order: result.confirmation }, result.created ? 201 : 200);
 }

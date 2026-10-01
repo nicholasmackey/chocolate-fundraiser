@@ -26,7 +26,10 @@
     // Optional: hostname Turnstile tokens must be issued for (e.g. "your-username.github.io").
     // Leave empty to skip the hostname check.
     "TURNSTILE_EXPECTED_HOSTNAME": "nicholasmackey.github.io",
+    // Admin UI base URL, linked from Telegram order notifications.
+    "ADMIN_URL": "https://nicholasmackey.github.io/chocolate-fundraiser/admin",
   },
   // Secrets (set with `wrangler secret put <NAME>`, or in .dev.vars locally):
   //   ADMIN_PASSWORD_HASH, SESSION_SECRET, TURNSTILE_SECRET_KEY
+  //   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (optional; notifications are skipped when unset)
 }
