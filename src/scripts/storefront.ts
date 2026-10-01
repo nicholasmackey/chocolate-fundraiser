@@ -125,10 +125,9 @@ function renderProducts(): void {
         badge.hidden = false;
         card.classList.add('opacity-60');
       } else if (ordering && product.availability === 'going_fast') {
-        badge.textContent = 'Going Fast';
+        badge.textContent = '🔥 Going Fast';
         badge.classList.add('bg-honey', 'text-cocoa-ink');
         badge.hidden = false;
-        card.querySelector<HTMLElement>('.product-hot')!.hidden = false;
       }
 
       const stepper = card.querySelector<HTMLElement>('.product-stepper')!;
